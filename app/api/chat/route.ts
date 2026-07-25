@@ -232,6 +232,18 @@ async function runN8n(payload: unknown, webhookUrl?: string): Promise<NextRespon
   });
 
   const text = await response.text();
+
+  // HTML response (e.g. nginx 504/502 error page) — return a friendly message instead of raw HTML
+  if (text.trimStart().startsWith("<")) {
+    const friendly =
+      response.status === 504 || response.status === 524
+        ? "O servidor está demorando para responder. Tente novamente em alguns instantes."
+        : response.status === 502 || response.status === 503
+          ? "O serviço está temporariamente indisponível. Tente novamente em breve."
+          : `Erro ${response.status} ao conectar com o n8n.`;
+    return NextResponse.json({ message: friendly }, { status: response.status });
+  }
+
   let body: unknown = text;
 
   try {
