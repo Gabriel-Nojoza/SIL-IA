@@ -19,6 +19,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# base DuckDB gerada pelo SIL_DATA_EXPORT
+.sil-dados/
+
 # misc
 .DS_Store
 *.pem

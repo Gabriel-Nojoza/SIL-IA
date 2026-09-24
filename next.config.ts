@@ -9,6 +9,8 @@ const withPWA = require("next-pwa")({
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Binário nativo: não pode ser empacotado pelo webpack
+  serverExternalPackages: ["@duckdb/node-api", "@duckdb/node-bindings"],
 };
 
 module.exports = withPWA(nextConfig);
