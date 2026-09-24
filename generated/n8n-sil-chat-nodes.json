@@ -1,0 +1,294 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sil-chat-ja",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "cb3fd1b1-427c-4da8-85d3-89f3f258056b",
+      "name": "Webhook SIL Chat",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -2368,
+        900
+      ],
+      "webhookId": "5d42920d-885a-4a7c-8899-dcafe801dc5b"
+    },
+    {
+      "parameters": {
+        "jsCode": "// SIL Chat — monta o prompt que transforma a pergunta em SQL (DuckDB)\n// Fluxo exclusivo da JA: a empresa é fixa aqui, nunca vem do payload\nconst COMPANY_ID = '8b4798b9-0386-4f04-95b4-913d2d868322';\n\nconst body = $input.first().json.body || {};\nconst pergunta = String(body.chatInput || body.message || '').trim();\nconst historico = Array.isArray(body.historico) ? body.historico.slice(-6) : [];\nconst conversa = historico\n  .map((h) => (h.role === 'user' ? 'Usuário: ' : 'SIL: ') + String(h.content || '').slice(0, 600))\n  .join('\\n');\n\nconst agora = $now.setZone('America/Fortaleza');\nconst hoje = agora.toFormat('dd/MM/yyyy');\nconst mesAtual = Number(agora.toFormat('yyyyMM'));\n\nconst ESQUEMA = `\nTabela base_comercial — uma linha por VENDEDOR × MÊS × FILIAL\n  mesanonum BIGINT (ex.: 202508), mes_ano VARCHAR (ex.: 'ago/25'), filial VARCHAR (ex.: '1 - JA DISTRIBUIDORA LTDA'),\n  codusur BIGINT (código do vendedor), nome VARCHAR (nome do vendedor), supervisor VARCHAR,\n  vl_faturados DOUBLE (faturamento R$), vl_venda DOUBLE (venda R$), vl_lucro DOUBLE (lucro R$),\n  margem_pct DOUBLE (fração: 0.19 = 19%), meta DOUBLE (R$, pode ser nula), pct_meta DOUBLE (fração),\n  qtde_pedidos BIGINT, qtde_clientes BIGINT, ticket_medio DOUBLE,\n  fat_anopassado DOUBLE, crescimento_pct DOUBLE (fração)\n\nTabela base_clientes — uma linha por CLIENTE × MÊS × FILIAL\n  mesanonum, mes_ano, filial, codcli BIGINT, cliente VARCHAR, municcob VARCHAR (cidade), estcob VARCHAR (UF),\n  ramo VARCHAR (ex.: 'REDES'), vl_faturados, vl_lucro, margem_pct, qtde_pedidos BIGINT, ticket_medio,\n  fat_anopassado, crescimento_pct\n\nTabela base_produtos — uma linha por PRODUTO × MÊS × FILIAL\n  mesanonum, mes_ano, filial, codprod BIGINT, descricao VARCHAR, marca VARCHAR (pode ser nula),\n  departamento VARCHAR, fornecedor VARCHAR, vl_faturados, vl_lucro, margem_pct,\n  qtde_vendas BIGINT (nº de vendas), soma_qtde DOUBLE (unidades vendidas), fat_anopassado, crescimento_pct\n`;\n\nconst promptSql = `Você escreve UMA consulta SQL (dialeto DuckDB) para responder perguntas sobre os dados comerciais da JA Distribuidora.\n\nHoje é ${hoje}. O mês atual é ${mesAtual} e está em andamento (dados até hoje). Os dados cobrem os últimos 14 meses.\n${ESQUEMA}\nRegras obrigatórias:\n- Use mesanonum para filtrar e ordenar períodos. Use mes_ano só para exibir.\n- \"Último mês fechado\" = o maior mesanonum menor que ${mesAtual}. Sem período na pergunta, use o mês atual.\n- Cada linha é por filial: para totais, SOME (SUM) e agrupe pela entidade, a menos que a pergunta peça por filial.\n- Margem agregada = SUM(vl_lucro) / NULLIF(SUM(vl_faturados), 0). Nunca faça média de margem_pct.\n- Ticket médio agregado = SUM(vl_faturados) / NULLIF(SUM(qtde_pedidos), 0).\n- % de meta agregado = SUM(vl_faturados) / NULLIF(SUM(meta), 0).\n- fat_anopassado e crescimento_pct só vêm preenchidos nas linhas do mês atual. Crescimento agregado = SUM(vl_faturados) / NULLIF(SUM(fat_anopassado), 0) - 1.\n- Faturamento total da empresa: use base_comercial.\n- Vendedor/supervisor/meta → base_comercial. Cliente/cidade/UF/ramo → base_clientes. Produto/marca/departamento/fornecedor → base_produtos.\n- Textos estão em MAIÚSCULAS e podem não ter acento: busque com strip_accents(coluna) ILIKE strip_accents('%termo%').\n- Rankings e listas: ORDER BY e LIMIT (no máximo 50). Nunca devolva linhas brutas sem agregar.\n- Arredonde valores com ROUND(x, 2). Dê nomes claros às colunas (ex.: faturamento, margem, mes).\n- Se a pergunta for uma continuação (ex.: \"e em julho?\", \"gera um gráfico disso\"), use a conversa anterior para entender o que refazer.\n- Se a pergunta não precisar de dados (saudação, ajuda, conversa), responda exatamente: SEM_CONSULTA\n\nConversa anterior:\n${conversa || '(nenhuma)'}\n\nPergunta: ${pergunta}\n\nResponda APENAS com o SQL (ou SEM_CONSULTA), sem explicação e sem markdown.`;\n\nreturn [{ json: { pergunta, company_id: COMPANY_ID, hoje, mesAtual, conversa, promptSql } }];\n"
+      },
+      "id": "72a54b6e-765c-4a83-bf32-ef16724dfdfd",
+      "name": "Preparar Pergunta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -2128,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.promptSql }}"
+      },
+      "id": "239b0cf4-a22d-45a9-932a-d2a371f34508",
+      "name": "Gerar SQL",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        -1888,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "id": "8a795c98-0aec-4f5c-9eac-bed758d4deb4",
+      "name": "Gemini SQL",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1888,
+        1100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Tira cercas de markdown; perguntas sem dados viram uma consulta inofensiva\nconst texto = String($input.first().json.text || '').trim();\nlet sql = texto.replace(/^```(?:sql)?\\s*/i, '').replace(/```\\s*$/, '').trim();\nif (!sql || /^SEM_CONSULTA/i.test(sql)) {\n  sql = \"select 'sem_consulta' as aviso\";\n}\nreturn [{ json: { sql } }];\n"
+      },
+      "id": "7653d481-03a1-43d1-91b7-7afaffa48e75",
+      "name": "Extrair SQL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1568,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:3002/api/dados/consulta",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer COLE_O_TOKEN_AQUI"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ company_id: $('Preparar Pergunta').first().json.company_id, sql: $json.sql }) }}",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "90b38f45-984a-4a2d-a60e-a42b7b1d1c74",
+      "name": "Consultar Base",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1328,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// SIL Chat — monta o prompt que transforma o resultado da consulta em blocos da SIL\nconst p = $('Preparar Pergunta').first().json;\nconst sql = $('Extrair SQL').first().json.sql;\nconst r = $input.first().json;\n\nlet dados;\nif (sql.includes(\"'sem_consulta'\")) {\n  dados = 'Nenhuma consulta foi necessária: é uma pergunta de conversa geral.';\n} else if (!r.ok) {\n  dados = 'A consulta falhou: ' + (r.message || 'erro desconhecido');\n} else {\n  dados = JSON.stringify({\n    colunas: r.colunas,\n    linhas: r.rows.slice(0, 150),\n    total_linhas: r.total,\n    truncado: r.truncado || r.rows.length > 150,\n  });\n}\n\nconst promptResposta = `Você é a SIL, assistente comercial da JA Distribuidora. Responda em português do Brasil, de forma direta e útil para um gestor.\n\nHoje é ${p.hoje}. O mês atual (${p.mesAtual}) está em andamento, então não o compare como se estivesse fechado.\n\nConversa anterior:\n${p.conversa || '(nenhuma)'}\n\nPergunta: ${p.pergunta}\n\nSQL executado:\n${sql}\n\nResultado:\n${dados}\n\nRegras:\n- Use SOMENTE os números do resultado. Nunca invente valores. Se o resultado vier vazio, diga que não encontrou dados para aquele filtro.\n- Se a consulta falhou, diga que não conseguiu buscar essa informação e sugira reformular a pergunta. Não mostre o SQL nem o erro técnico.\n- Valores em R$ no formato brasileiro (R$ 1.234.567,89). Colunas de fração (margem, pct_meta, crescimento) viram porcentagem: 0.19 → 19,0%.\n- Para listas com mais de 3 itens, use um bloco \"table\".\n- Use \"chart\" quando o usuário pedir gráfico, ou para evolução mês a mês (line) e rankings (horizontal-bar). Nos gráficos, values são números puros (sem R$).\n- Termine com um \"insight\" curto quando houver algo relevante (queda, destaque, concentração).\n\nResponda APENAS com JSON válido, sem markdown, neste formato:\n{\"blocks\": [ ...blocos... ]}\n\nTipos de bloco permitidos:\n{\"type\":\"text\",\"content\":\"texto\"}\n{\"type\":\"insight\",\"severity\":\"info|success|warning|danger\",\"content\":\"texto\"}\n{\"type\":\"table\",\"title\":\"título\",\"headers\":[\"Col1\",\"Col2\"],\"rows\":[[\"a\",\"R$ 1.000,00\"]]}\n{\"type\":\"chart\",\"chartType\":\"bar|horizontal-bar|line|pie\",\"title\":\"título\",\"data\":{\"labels\":[\"a\",\"b\"],\"datasets\":[{\"label\":\"Faturamento\",\"values\":[1000,2000]}]},\"config\":{\"currency\":true}}`;\n\nreturn [{ json: { promptResposta } }];\n"
+      },
+      "id": "7d11380b-77d1-4ce7-b78f-b4b57fb2b46d",
+      "name": "Preparar Resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1088,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.promptResposta }}"
+      },
+      "id": "1d8d4150-6819-40b7-89f7-9fcab60d4003",
+      "name": "Responder",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        -848,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.5-flash",
+        "options": {
+          "temperature": 0
+        }
+      },
+      "id": "90d3a510-39e6-4eea-9c9c-47707e15e514",
+      "name": "Gemini Resposta",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -848,
+        1100
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Valida o JSON da IA; se vier quebrado, devolve o texto puro para o chat não ficar sem resposta\nconst texto = String($input.first().json.text || '')\n  .trim()\n  .replace(/^```(?:json)?\\s*/i, '')\n  .replace(/```\\s*$/, '')\n  .trim();\nconst TIPOS = ['text', 'insight', 'table', 'chart', 'action'];\n\nlet blocks = [];\ntry {\n  const j = JSON.parse(texto);\n  blocks = (Array.isArray(j) ? j : j.blocks || []).filter((b) => b && TIPOS.includes(b.type));\n} catch (e) {}\n\nif (!blocks.length) {\n  blocks = [{ type: 'text', content: texto || 'Não consegui montar a resposta. Tente reformular a pergunta.' }];\n}\n\nconst primeiro = blocks.find((b) => b.type === 'text' || b.type === 'insight');\nreturn [{ json: { blocks, message: primeiro ? primeiro.content : 'Resposta da SIL' } }];\n"
+      },
+      "id": "dbfa385e-7b52-45b4-9871-079f556e0bf8",
+      "name": "Montar Blocos",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        900
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "4dd321fb-784e-4773-b4b8-f01d1c6e3bd4",
+      "name": "Responder Chat",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -288,
+        900
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook SIL Chat": {
+      "main": [
+        [
+          {
+            "node": "Preparar Pergunta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Pergunta": {
+      "main": [
+        [
+          {
+            "node": "Gerar SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gerar SQL": {
+      "main": [
+        [
+          {
+            "node": "Extrair SQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair SQL": {
+      "main": [
+        [
+          {
+            "node": "Consultar Base",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Consultar Base": {
+      "main": [
+        [
+          {
+            "node": "Preparar Resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar Resposta": {
+      "main": [
+        [
+          {
+            "node": "Responder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Responder": {
+      "main": [
+        [
+          {
+            "node": "Montar Blocos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar Blocos": {
+      "main": [
+        [
+          {
+            "node": "Responder Chat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini SQL": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Gerar SQL",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Resposta": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Responder",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

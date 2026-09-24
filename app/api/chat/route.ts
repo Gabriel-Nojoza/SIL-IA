@@ -221,7 +221,12 @@ async function runN8n(payload: unknown, webhookUrl?: string): Promise<NextRespon
 
   // Remove `history` from the payload — n8n manages its own session memory via sessionId.
   // Sending both causes the AI Agent to receive duplicate context and fail on turn 2+.
-  const { history: _history, ...n8nPayload } = payload as Record<string, unknown>;
+  // `historico` (últimas mensagens) é lido pelo chat do SIL_DATA_EXPORT, que não tem memória própria.
+  const { history: _history, ...rest } = payload as Record<string, unknown>;
+  const n8nPayload = {
+    ...rest,
+    historico: getPayloadHistory(payload as Record<string, unknown>).slice(-6),
+  };
 
   const url = webhookUrl;
   const response = await fetch(url, {
