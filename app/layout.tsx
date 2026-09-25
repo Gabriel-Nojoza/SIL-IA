@@ -10,7 +10,7 @@ const sora = Sora({
 
 export const metadata: Metadata = {
   title: "SIL Chat",
-  description: "Chat de IA da SIL para consulta e analise de dados no Power BI.",
+  description: "Chat de IA da SIL para consulta e análise de dados comerciais.",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,

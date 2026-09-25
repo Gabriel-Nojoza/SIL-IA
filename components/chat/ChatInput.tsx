@@ -1,4 +1,5 @@
-import { KeyboardEvent } from "react";
+import { KeyboardEvent, useEffect, useRef } from "react";
+import { ArrowUp, LoaderCircle } from "lucide-react";
 
 interface ChatInputProps {
   value: string;
@@ -13,6 +14,16 @@ export function ChatInput({
   onSend,
   disabled = false,
 }: ChatInputProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Cresce com o texto até ~6 linhas; depois rola por dentro
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+  }, [value]);
+
   function handleKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
@@ -21,20 +32,21 @@ export function ChatInput({
   }
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-3">
-      <div className="flex flex-col gap-3 rounded-[26px] border border-border/80 bg-white/[0.03] p-3 sm:flex-row sm:items-end">
+    <div className="mx-auto w-full max-w-3xl">
+      <div className="flex items-end gap-2 rounded-2xl border border-border/70 bg-card/80 p-2 shadow-soft transition focus-within:border-accent/60">
         <label className="sr-only" htmlFor="chat-input">
           Digite sua pergunta
         </label>
 
         <textarea
+          ref={textareaRef}
           id="chat-input"
           rows={1}
           value={value}
           onChange={(event) => onChange(event.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Pergunte sobre seus dados..."
-          className="min-h-[52px] flex-1 resize-none rounded-2xl border border-transparent bg-transparent px-4 py-3 text-base text-foreground outline-none placeholder:text-muted sm:min-h-[64px] sm:text-sm"
+          placeholder="Pergunte sobre vendas, clientes ou produtos..."
+          className="max-h-40 min-h-[44px] flex-1 resize-none bg-transparent px-3 py-2.5 text-base leading-6 text-foreground outline-none placeholder:text-muted sm:text-sm"
           disabled={disabled}
         />
 
@@ -42,14 +54,15 @@ export function ChatInput({
           type="button"
           onClick={onSend}
           disabled={disabled || !value.trim()}
-          className="inline-flex h-11 w-full items-center justify-center rounded-2xl bg-accent px-5 text-sm font-semibold text-white transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-50 sm:h-12 sm:w-auto sm:min-w-[132px]"
+          aria-label="Enviar"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-accent text-white transition hover:bg-accent/90 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {disabled ? "Enviando..." : "Enviar"}
+          {disabled ? <LoaderCircle size={18} className="animate-spin" /> : <ArrowUp size={18} />}
         </button>
       </div>
 
-      <p className="hidden px-1 text-xs text-muted sm:block">
-        Enter envia a mensagem. Shift + Enter cria uma nova linha.
+      <p className="mt-2 hidden text-center text-[11px] text-muted/80 sm:block">
+        Enter envia · Shift + Enter quebra a linha · A SIL pode errar: confira números importantes.
       </p>
     </div>
   );

@@ -12,20 +12,8 @@ import { createUuid } from "@/lib/uuid";
 import { useAuthContext } from "@/hooks/use-auth-context";
 import type { ChatMessage, ChatRequestPayload, MessageStatus } from "@/types/chat";
 
-function welcomeMessage(): ChatMessage {
-  return {
-    id: "welcome",
-    role: "assistant",
-    content: "Olá! Eu sou a SIL.\nEstou aqui para ajudar você a consultar e entender seus dados no Power BI.\nComo posso ajudar hoje?",
-    createdAt: new Date().toISOString(),
-    status: "sent",
-  };
-}
-
 async function saveSession(sessionId: string, userId: string, companyId: string, messages: ChatMessage[]) {
-  const real = messages.filter((m) => m.id !== "welcome");
-  if (!sessionId || real.length === 0) return;
-  messages = real;
+  if (!sessionId || messages.length === 0) return;
   const supabase = getSupabaseBrowserClient();
   const { error } = await supabase.from("conversation_logs").upsert(
     { session_id: sessionId, user_id: userId, company_id: companyId, messages },
@@ -38,7 +26,7 @@ export function ChatScreen() {
   const { user } = useAuthContext();
   const company = user?.company;
   const [sessionId, setSessionId] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([welcomeMessage()]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,12 +39,12 @@ export function ChatScreen() {
 
   function handleNewChat() {
     setSessionId(createUuid());
-    setMessages([welcomeMessage()]);
+    setMessages([]);
     setError(null);
   }
 
-  async function handleSendMessage() {
-    const trimmedInput = inputValue.trim();
+  async function handleSendMessage(texto?: string) {
+    const trimmedInput = (texto ?? inputValue).trim();
     if (!trimmedInput || isSending) return;
 
     const activeSessionId = sessionId || createUuid();
@@ -88,7 +76,6 @@ export function ChatScreen() {
       dataset_id: company.datasetId,
       webhook_url: user.webhookUrl || company.webhookUrl,
       history: messages
-        .filter((message) => message.id !== "welcome")
         .slice(-8)
         .map((message) => ({
           role: message.role,
@@ -150,12 +137,19 @@ export function ChatScreen() {
         <ChatInput
           value={inputValue}
           onChange={setInputValue}
-          onSend={handleSendMessage}
+          onSend={() => handleSendMessage()}
           disabled={isSending}
         />
       }
     >
-      <MessageList messages={messages} isSending={isSending} error={error} />
+      <MessageList
+        messages={messages}
+        isSending={isSending}
+        error={error}
+        userName={user?.name ?? ""}
+        companyName={company?.companyName ?? ""}
+        onSuggestion={(pergunta) => handleSendMessage(pergunta)}
+      />
     </ChatLayout>
   );
 }

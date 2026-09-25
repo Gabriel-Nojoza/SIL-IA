@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Plus, Trash2 } from "lucide-react";
 import { getSupabaseBrowserClient } from "@/lib/supabase";
 import type { ChatMessage } from "@/types/chat";
 
@@ -80,61 +81,87 @@ export function HistorySidebar({ userId, currentSessionId, refreshTick, onSelect
     onSelectSession(sessionId, msgs);
   }
 
-  function formatDate(iso: string) {
-    return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+  // sessions já vem da mais recente para a mais antiga, então os grupos saem em ordem
+  const grupos: { titulo: string; itens: Session[] }[] = [];
+  for (const s of sessions) {
+    const titulo = grupoDaData(s.created_at);
+    const ultimo = grupos[grupos.length - 1];
+    if (ultimo?.titulo === titulo) ultimo.itens.push(s);
+    else grupos.push({ titulo, itens: [s] });
   }
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-border/80 px-4 py-4">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-accent/90">Histórico</p>
+      <div className="px-3 pb-2 pt-4">
         <button
           type="button"
           onClick={onNewChat}
-          className="mt-3 flex w-full items-center gap-2 rounded-xl border border-border/80 bg-white/5 px-3 py-2.5 text-sm text-foreground transition hover:border-accent/50 hover:bg-accent/10"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-accent px-3 py-2.5 text-sm font-medium text-white transition hover:bg-accent/90"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
+          <Plus size={16} />
           Nova conversa
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="chat-scrollbar flex-1 overflow-y-auto px-2 pb-4">
         {loading ? (
-          <p className="px-4 py-3 text-xs text-muted">Carregando...</p>
+          <p className="px-3 py-3 text-xs text-muted">Carregando...</p>
         ) : sessions.length === 0 ? (
-          <p className="px-4 py-3 text-xs text-muted">Nenhuma conversa ainda.</p>
+          <p className="px-3 py-3 text-xs leading-5 text-muted">
+            Suas conversas aparecem aqui. Faça a primeira pergunta para começar.
+          </p>
         ) : (
-          sessions.map((s) => (
-            <div
-              key={s.session_id}
-              className={`group relative flex items-center transition hover:bg-white/5 ${
-                s.session_id === currentSessionId ? "bg-accent/10 border-l-2 border-accent" : ""
-              }`}
-            >
-              <button
-                type="button"
-                onClick={() => handleSelect(s.session_id)}
-                className="min-w-0 flex-1 px-4 py-3 text-left"
-              >
-                <p className="truncate text-sm text-foreground">{s.first_message}</p>
-                <p className="mt-0.5 text-xs text-muted">{formatDate(s.created_at)}</p>
-              </button>
-              <button
-                type="button"
-                onClick={(e) => handleDelete(s.session_id, e)}
-                className="mr-2 flex shrink-0 rounded p-1 text-muted/40 transition hover:text-red-400 sm:hidden sm:group-hover:flex"
-                title="Apagar conversa"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/>
-                </svg>
-              </button>
+          grupos.map((grupo) => (
+            <div key={grupo.titulo} className="mt-3">
+              <p className="px-3 pb-1 text-[11px] font-medium uppercase tracking-wider text-muted/80">
+                {grupo.titulo}
+              </p>
+              {grupo.itens.map((s) => (
+                <div
+                  key={s.session_id}
+                  className={`group relative flex items-center rounded-lg transition hover:bg-white/[0.05] ${
+                    s.session_id === currentSessionId ? "bg-white/[0.07]" : ""
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(s.session_id)}
+                    className="min-w-0 flex-1 px-3 py-2 text-left"
+                    title={s.first_message}
+                  >
+                    <p
+                      className={`truncate text-sm ${
+                        s.session_id === currentSessionId ? "text-foreground" : "text-foreground/80"
+                      }`}
+                    >
+                      {s.first_message}
+                    </p>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => handleDelete(s.session_id, e)}
+                    className="mr-1 flex shrink-0 rounded p-1.5 text-muted/60 transition hover:text-red-400 sm:hidden sm:group-hover:flex"
+                    title="Apagar conversa"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              ))}
             </div>
           ))
         )}
       </div>
     </div>
   );
+}
+
+function grupoDaData(iso: string) {
+  const agora = new Date();
+  const inicioDeHoje = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate()).getTime();
+  const umDia = 86_400_000;
+  const t = new Date(iso).getTime();
+  if (t >= inicioDeHoje) return "Hoje";
+  if (t >= inicioDeHoje - umDia) return "Ontem";
+  if (t >= inicioDeHoje - 6 * umDia) return "Últimos 7 dias";
+  return "Anteriores";
 }
