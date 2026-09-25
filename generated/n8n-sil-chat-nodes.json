@@ -7,7 +7,7 @@
         "responseMode": "responseNode",
         "options": {}
       },
-      "id": "7395c3c3-c801-4e76-86b0-3a0a5da8afad",
+      "id": "95db2328-3bc4-4bd9-aede-eb07ee7853c8",
       "name": "Webhook SIL Chat",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
@@ -15,13 +15,13 @@
         -2368,
         900
       ],
-      "webhookId": "7a70d726-8a68-466c-b5ef-4ee2571b2689"
+      "webhookId": "288adfb9-7e3f-4b74-9445-47fd00942f33"
     },
     {
       "parameters": {
-        "jsCode": "// SIL Chat — monta o prompt que transforma a pergunta em SQL (DuckDB)\n// Fluxo exclusivo da JA: a empresa é fixa aqui, nunca vem do payload\nconst COMPANY_ID = '8b4798b9-0386-4f04-95b4-913d2d868322';\n\nconst body = $input.first().json.body || {};\nconst pergunta = String(body.chatInput || body.message || '').trim();\nconst historico = Array.isArray(body.historico) ? body.historico.slice(-6) : [];\nconst conversa = historico\n  .map((h) => (h.role === 'user' ? 'Usuário: ' : 'SIL: ') + String(h.content || '').slice(0, 600))\n  .join('\\n');\n\nconst agora = $now.setZone('America/Fortaleza');\nconst hoje = agora.toFormat('dd/MM/yyyy');\nconst mesAtual = Number(agora.toFormat('yyyyMM'));\n\nconst ESQUEMA = `\nTabela base_comercial — uma linha por VENDEDOR × MÊS × FILIAL\n  mesanonum BIGINT (ex.: 202508), mes_ano VARCHAR (ex.: 'ago/25'), filial VARCHAR (ex.: '1 - JA DISTRIBUIDORA LTDA'),\n  codusur BIGINT (código do vendedor), nome VARCHAR (nome do vendedor), supervisor VARCHAR,\n  vl_faturados DOUBLE (faturamento R$), vl_venda DOUBLE (venda R$), vl_lucro DOUBLE (lucro R$),\n  margem_pct DOUBLE (fração: 0.19 = 19%), meta DOUBLE (R$, pode ser nula), pct_meta DOUBLE (fração),\n  qtde_pedidos BIGINT, qtde_clientes BIGINT, ticket_medio DOUBLE,\n  fat_anopassado DOUBLE, crescimento_pct DOUBLE (fração)\n\nTabela base_clientes — uma linha por CLIENTE × MÊS × FILIAL\n  mesanonum, mes_ano, filial, codcli BIGINT, cliente VARCHAR, municcob VARCHAR (cidade), estcob VARCHAR (UF),\n  ramo VARCHAR (ex.: 'REDES'), vl_faturados, vl_lucro, margem_pct, qtde_pedidos BIGINT, ticket_medio,\n  fat_anopassado, crescimento_pct\n\nTabela base_produtos — uma linha por PRODUTO × MÊS × FILIAL\n  mesanonum, mes_ano, filial, codprod BIGINT, descricao VARCHAR, marca VARCHAR (pode ser nula),\n  departamento VARCHAR, fornecedor VARCHAR, vl_faturados, vl_lucro, margem_pct,\n  qtde_vendas BIGINT (nº de vendas), soma_qtde DOUBLE (unidades vendidas), fat_anopassado, crescimento_pct\n`;\n\nconst promptSql = `Você escreve UMA consulta SQL (dialeto DuckDB) para responder perguntas sobre os dados comerciais da JA Distribuidora.\n\nHoje é ${hoje}. O mês atual é ${mesAtual} e está em andamento (dados até hoje). Os dados cobrem os últimos 14 meses.\n${ESQUEMA}\nRegras obrigatórias:\n- Use mesanonum para filtrar e ordenar períodos. Use mes_ano só para exibir.\n- \"Último mês fechado\" = o maior mesanonum menor que ${mesAtual}. Sem período na pergunta, use o mês atual.\n- Cada linha é por filial: para totais, SOME (SUM) e agrupe pela entidade, a menos que a pergunta peça por filial.\n- Margem agregada = SUM(vl_lucro) / NULLIF(SUM(vl_faturados), 0). Nunca faça média de margem_pct.\n- Ticket médio agregado = SUM(vl_faturados) / NULLIF(SUM(qtde_pedidos), 0).\n- % de meta agregado = SUM(vl_faturados) / NULLIF(SUM(meta), 0).\n- fat_anopassado e crescimento_pct só vêm preenchidos nas linhas do mês atual. Crescimento agregado = SUM(vl_faturados) / NULLIF(SUM(fat_anopassado), 0) - 1.\n- Faturamento total da empresa: use base_comercial.\n- Vendedor/supervisor/meta → base_comercial. Cliente/cidade/UF/ramo → base_clientes. Produto/marca/departamento/fornecedor → base_produtos.\n- Textos estão em MAIÚSCULAS e podem não ter acento: busque com strip_accents(coluna) ILIKE strip_accents('%termo%').\n- Rankings e listas: ORDER BY e LIMIT (no máximo 50). Nunca devolva linhas brutas sem agregar.\n- Arredonde valores com ROUND(x, 2). Dê nomes claros às colunas (ex.: faturamento, margem, mes).\n- Se a pergunta for uma continuação (ex.: \"e em julho?\", \"gera um gráfico disso\"), use a conversa anterior para entender o que refazer.\n- Se a pergunta não precisar de dados (saudação, ajuda, conversa), responda exatamente: SEM_CONSULTA\n\nConversa anterior:\n${conversa || '(nenhuma)'}\n\nPergunta: ${pergunta}\n\nResponda APENAS com o SQL (ou SEM_CONSULTA), sem explicação e sem markdown.`;\n\nreturn [{ json: { pergunta, company_id: COMPANY_ID, hoje, mesAtual, conversa, promptSql } }];\n"
+        "jsCode": "// SIL Chat — monta o prompt que transforma a pergunta em SQL (DuckDB)\n// Fluxo exclusivo da JA: a empresa é fixa aqui, nunca vem do payload\nconst COMPANY_ID = '8b4798b9-0386-4f04-95b4-913d2d868322';\n\nconst body = $input.first().json.body || {};\nconst pergunta = String(body.chatInput || body.message || '').trim();\n// Histórico curto: cada token conta no limite por minuto da IA\nconst historico = Array.isArray(body.historico) ? body.historico.slice(-4) : [];\nconst conversa = historico\n  .map((h) => (h.role === 'user' ? 'Usuário: ' : 'SIL: ') + String(h.content || '').slice(0, 300))\n  .join('\\n');\n\nconst agora = $now.setZone('America/Fortaleza');\nconst hoje = agora.toFormat('dd/MM/yyyy');\nconst mesAtual = Number(agora.toFormat('yyyyMM'));\nconst diasNoMes = agora.daysInMonth;\n// A base é carregada às 06h com o faturamento até o dia anterior\nconst diasDecorridos = Math.max(agora.day - 1, 1);\n\nconst ESQUEMA = `\nTabela base_comercial — uma linha por VENDEDOR × MÊS × FILIAL\n  mesanonum BIGINT (ex.: 202508), mes_ano VARCHAR (ex.: 'ago/25'), filial VARCHAR (ex.: '1 - JA DISTRIBUIDORA LTDA'),\n  codusur BIGINT, nome VARCHAR (vendedor), supervisor VARCHAR,\n  vl_faturados DOUBLE (faturamento R$), vl_venda DOUBLE, vl_lucro DOUBLE,\n  margem_pct DOUBLE (fração), meta DOUBLE (R$, pode ser nula), pct_meta DOUBLE (fração),\n  qtde_pedidos BIGINT, qtde_clientes BIGINT, ticket_medio DOUBLE, fat_anopassado DOUBLE, crescimento_pct DOUBLE (fração)\n\nTabela base_clientes — uma linha por CLIENTE × MÊS × FILIAL\n  mesanonum, mes_ano, filial, codcli BIGINT, cliente VARCHAR, municcob VARCHAR (cidade), estcob VARCHAR (UF),\n  ramo VARCHAR, vl_faturados, vl_lucro, margem_pct, qtde_pedidos, ticket_medio, fat_anopassado, crescimento_pct\n\nTabela base_produtos — uma linha por PRODUTO × MÊS × FILIAL\n  mesanonum, mes_ano, filial, codprod BIGINT, descricao VARCHAR, marca VARCHAR, departamento VARCHAR, fornecedor VARCHAR,\n  vl_faturados, vl_lucro, margem_pct, qtde_vendas BIGINT, soma_qtde DOUBLE (unidades), fat_anopassado, crescimento_pct\n`;\n\nconst promptSql = `Você escreve UMA consulta SQL (dialeto DuckDB) sobre os dados comerciais da JA Distribuidora.\n\nHoje é ${hoje}. Mês atual: ${mesAtual}, em andamento (${diasDecorridos} de ${diasNoMes} dias corridos já faturados). Os dados cobrem os últimos 14 meses.\n${ESQUEMA}\nRegras:\n- Filtre e ordene períodos por mesanonum; mes_ano só para exibir. \"Mês passado\" = maior mesanonum < ${mesAtual}. Sem período, use o mês atual.\n- Cada linha é por filial: SOME (SUM) e agrupe pela entidade, a menos que peçam por filial.\n- Margem = SUM(vl_lucro) / NULLIF(SUM(vl_faturados), 0). Ticket médio = SUM(vl_faturados) / NULLIF(SUM(qtde_pedidos), 0). % meta = SUM(vl_faturados) / NULLIF(SUM(meta), 0). Nunca faça média de colunas _pct.\n- Percentuais sempre como FRAÇÃO (0.19 = 19%). Nunca multiplique por 100.\n- Tendência (projeção de fechamento) do mês atual = SUM(vl_faturados) / ${diasDecorridos} * ${diasNoMes}. % de tendência = tendência / NULLIF(SUM(meta), 0). Nunca compare o mês atual parcial com um mês fechado sem projetar.\n- Crescimento vs ano passado (só existe no mês atual) = SUM(vl_faturados) / NULLIF(SUM(fat_anopassado), 0) - 1.\n- Faturamento total da empresa: base_comercial. Vendedor/supervisor/meta → base_comercial. Cliente/cidade/UF/ramo → base_clientes. Produto/marca/departamento/fornecedor → base_produtos.\n- Textos em MAIÚSCULAS, às vezes sem acento: strip_accents(coluna) ILIKE strip_accents('%termo%').\n- Rankings/listas: ORDER BY e LIMIT (máx. 50). Nunca devolva linhas brutas sem agregar. ROUND(x, 2) nos valores. Nomes de coluna curtos e claros, sem acento nem espaço (ex.: vendedor, faturamento, margem, tendencia).\n- Continuação (\"e em julho?\", \"gera um gráfico disso\", \"monte uma planilha\"): refaça a consulta anterior com o ajuste pedido.\n- Se não precisar de dados (saudação, ajuda), responda exatamente: SEM_CONSULTA\n\nConversa anterior:\n${conversa || '(nenhuma)'}\n\nPergunta: ${pergunta}\n\nResponda APENAS com o SQL (ou SEM_CONSULTA), sem explicação e sem markdown.`;\n\nreturn [{ json: { pergunta, company_id: COMPANY_ID, hoje, mesAtual, diasNoMes, diasDecorridos, conversa, promptSql } }];\n"
       },
-      "id": "da87eedb-689c-42ee-b987-a9bcd1f82c39",
+      "id": "a2ff1ef4-be24-4b87-970a-4d9e4897e886",
       "name": "Preparar Pergunta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -36,7 +36,7 @@
         "text": "={{ $json.promptSql }}"
       },
       "onError": "continueRegularOutput",
-      "id": "9dd36046-948f-41b2-96fd-847fad55777c",
+      "id": "b4d1a1e8-b0ca-4760-959f-4e35f3bd85ec",
       "name": "Gerar SQL",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.5,
@@ -47,14 +47,14 @@
     },
     {
       "parameters": {
-        "modelName": "models/gemini-3.8-flash",
+        "model": "openai/gpt-oss-120b",
         "options": {
           "temperature": 0
         }
       },
-      "id": "6a754c4d-33d7-42cd-8652-19a53ceb598e",
-      "name": "Gemini SQL",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "id": "6e257407-2976-4f94-9f2a-609593df036d",
+      "name": "Groq SQL",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
       "typeVersion": 1,
       "position": [
         -1888,
@@ -65,7 +65,7 @@
       "parameters": {
         "jsCode": "// Tira cercas de markdown; perguntas sem dados viram uma consulta inofensiva\nconst entrada = $input.first().json;\nconst texto = String(entrada.text || '').trim();\nlet sql = texto.replace(/^```(?:sql)?\\s*/i, '').replace(/```\\s*$/, '').trim();\nif (entrada.error) {\n  // A IA falhou ao gerar o SQL: segue sem consultar, e o \"Responder\"/\"Montar Blocos\" avisam o usuário\n  sql = \"select 'falha_ia' as aviso\";\n} else if (!sql || /^SEM_CONSULTA/i.test(sql)) {\n  sql = \"select 'sem_consulta' as aviso\";\n}\nreturn [{ json: { sql } }];\n"
       },
-      "id": "22fc0c74-dd2e-4192-89e1-d6aecf76897f",
+      "id": "69094222-85c6-4894-9ee6-b37c4703d7bb",
       "name": "Extrair SQL",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -99,7 +99,7 @@
           }
         }
       },
-      "id": "400c2b2c-dfcd-4067-bbf8-d300c666f993",
+      "id": "0b4bc3cb-d158-4bae-8bf3-57bfdc90847d",
       "name": "Consultar Base",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -110,9 +110,9 @@
     },
     {
       "parameters": {
-        "jsCode": "// SIL Chat — monta o prompt que transforma o resultado da consulta em blocos da SIL\nconst p = $('Preparar Pergunta').first().json;\nconst sql = $('Extrair SQL').first().json.sql;\nconst r = $input.first().json;\n\nlet dados;\nif (sql.includes(\"'falha_ia'\")) {\n  dados = 'A consulta não foi feita por uma falha temporária. Diga que não conseguiu responder agora e peça para tentar novamente em instantes.';\n} else if (sql.includes(\"'sem_consulta'\")) {\n  dados = 'Nenhuma consulta foi necessária: é uma pergunta de conversa geral.';\n} else if (!r.ok) {\n  dados = 'A consulta falhou: ' + (r.message || 'erro desconhecido');\n} else {\n  dados = JSON.stringify({\n    colunas: r.colunas,\n    linhas: r.rows.slice(0, 150),\n    total_linhas: r.total,\n    truncado: r.truncado || r.rows.length > 150,\n  });\n}\n\nconst promptResposta = `Você é a SIL, assistente comercial da JA Distribuidora. Responda em português do Brasil, de forma direta e útil para um gestor.\n\nHoje é ${p.hoje}. O mês atual (${p.mesAtual}) está em andamento, então não o compare como se estivesse fechado.\n\nConversa anterior:\n${p.conversa || '(nenhuma)'}\n\nPergunta: ${p.pergunta}\n\nSQL executado:\n${sql}\n\nResultado:\n${dados}\n\nRegras:\n- Use SOMENTE os números do resultado. Nunca invente valores. Se o resultado vier vazio, diga que não encontrou dados para aquele filtro.\n- Se a consulta falhou, diga que não conseguiu buscar essa informação e sugira reformular a pergunta. Não mostre o SQL nem o erro técnico.\n- Valores em R$ no formato brasileiro (R$ 1.234.567,89). Colunas de fração (margem, pct_meta, crescimento) viram porcentagem: 0.19 → 19,0%.\n- Para listas com mais de 3 itens, use um bloco \"table\".\n- Use \"chart\" quando o usuário pedir gráfico, ou para evolução mês a mês (line) e rankings (horizontal-bar). Nos gráficos, values são números puros (sem R$).\n- Termine com um \"insight\" curto quando houver algo relevante (queda, destaque, concentração).\n\nResponda APENAS com JSON válido, sem markdown, neste formato:\n{\"blocks\": [ ...blocos... ]}\n\nTipos de bloco permitidos:\n{\"type\":\"text\",\"content\":\"texto\"}\n{\"type\":\"insight\",\"severity\":\"info|success|warning|danger\",\"content\":\"texto\"}\n{\"type\":\"table\",\"title\":\"título\",\"headers\":[\"Col1\",\"Col2\"],\"rows\":[[\"a\",\"R$ 1.000,00\"]]}\n{\"type\":\"chart\",\"chartType\":\"bar|horizontal-bar|line|pie\",\"title\":\"título\",\"data\":{\"labels\":[\"a\",\"b\"],\"datasets\":[{\"label\":\"Faturamento\",\"values\":[1000,2000]}]},\"config\":{\"currency\":true}}`;\n\nreturn [{ json: { promptResposta } }];\n"
+        "jsCode": "// SIL Chat — prompt curto para a IA escrever só o resumo e dizer como formatar.\n// A tabela e o gráfico são montados no \"Montar Blocos\" com os dados reais da consulta.\nconst p = $('Preparar Pergunta').first().json;\nconst sql = $('Extrair SQL').first().json.sql;\nconst r = $input.first().json;\nconst MAX_LINHAS_IA = 30;\n\nlet situacao;\nif (sql.includes(\"'falha_ia'\")) situacao = 'falha';\nelse if (sql.includes(\"'sem_consulta'\")) situacao = 'conversa';\nelse if (!r.ok) situacao = 'erro';\nelse if (!r.rows || !r.rows.length) situacao = 'vazio';\nelse situacao = 'dados';\n\nlet promptResposta;\nif (situacao === 'conversa') {\n  promptResposta = `Você é a SIL, assistente comercial da JA Distribuidora. Você responde perguntas sobre faturamento, vendedores, supervisores, clientes, produtos, margem, metas e tendência do mês.\n\nConversa anterior:\n${p.conversa || '(nenhuma)'}\n\nMensagem do usuário: ${p.pergunta}\n\nResponda em português, em 1 a 3 frases, APENAS com JSON: {\"resumo\": \"sua resposta\"}`;\n} else if (situacao === 'dados') {\n  // Linhas como listas (sem repetir o nome da coluna em cada uma) para gastar menos tokens\n  const linhas = r.rows.slice(0, MAX_LINHAS_IA).map((l) => r.colunas.map((c) => l[c]));\n  const dados = JSON.stringify({ colunas: r.colunas, linhas, total_linhas: r.rows.length });\n\n  promptResposta = `Você é a SIL, assistente comercial da JA Distribuidora. Hoje é ${p.hoje}; o mês atual (${p.mesAtual}) está em andamento.\n\nPergunta: ${p.pergunta}\n\nSQL executado:\n${sql}\n\nResultado (até ${MAX_LINHAS_IA} linhas):\n${dados}\n\nO sistema monta a tabela e o gráfico automaticamente com esses dados. NÃO repita a lista de valores.\nResponda APENAS com JSON válido, sem markdown:\n{\n  \"resumo\": \"1 a 3 frases respondendo a pergunta com os números principais (R$ 1.234.567,89; 19,0%)\",\n  \"titulo\": \"título curto da tabela\",\n  \"colunas\": {\"<coluna>\": {\"nome\": \"Nome amigável\", \"formato\": \"moeda|percentual|numero|texto\"}},\n  \"grafico\": null,\n  \"insight\": null\n}\n- \"percentual\" = a coluna é fração (0.19 → 19,0%). Veja no SQL se houve multiplicação por 100; nesse caso use \"numero\".\n- \"grafico\": só se o usuário pediu gráfico, ou para evolução mês a mês (line) ou ranking (horizontal-bar). Formato: {\"tipo\": \"bar|horizontal-bar|line|pie\", \"titulo\": \"...\", \"rotulo\": \"<coluna das categorias>\", \"valores\": [\"<coluna numérica>\"]}\n- \"insight\": algo relevante (queda, destaque, concentração) ou null. Formato: {\"severity\": \"info|success|warning|danger\", \"content\": \"...\"}\n- Use SOMENTE números do resultado. Nunca invente valores.`;\n} else {\n  // falha / erro / vazio: o \"Montar Blocos\" responde com uma mensagem fixa; a IA nem precisa pensar\n  promptResposta = 'Responda apenas com: {\"resumo\": \"\"}';\n}\n\nreturn [{ json: { situacao, promptResposta } }];\n"
       },
-      "id": "c1851949-c2e7-476d-b4aa-def35ef58f57",
+      "id": "fd0d2301-ecc8-4e15-9f07-352cce251ba0",
       "name": "Preparar Resposta",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -127,7 +127,7 @@
         "text": "={{ $json.promptResposta }}"
       },
       "onError": "continueRegularOutput",
-      "id": "2adaeb0e-97df-4396-a3cd-f12ecdd10861",
+      "id": "1355b140-d812-410e-983a-42ec7b841e56",
       "name": "Responder",
       "type": "@n8n/n8n-nodes-langchain.chainLlm",
       "typeVersion": 1.5,
@@ -138,14 +138,14 @@
     },
     {
       "parameters": {
-        "modelName": "models/gemini-3.8-flash",
+        "model": "llama-3.3-70b-versatile",
         "options": {
           "temperature": 0
         }
       },
-      "id": "5320fc38-41fe-45ee-bd28-4e9aec418be9",
-      "name": "Gemini Resposta",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "id": "1a2356fe-ee34-4545-a96e-995479bf3f76",
+      "name": "Groq Resposta",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
       "typeVersion": 1,
       "position": [
         -848,
@@ -154,9 +154,9 @@
     },
     {
       "parameters": {
-        "jsCode": "// Valida o JSON da IA; se vier quebrado, devolve o texto puro para o chat não ficar sem resposta\nconst entrada = $input.first().json;\nconst TIPOS = ['text', 'insight', 'table', 'chart', 'action'];\n\n// A IA falhou (limite de uso, fora do ar): o nó \"Responder\" segue com { error }\nif (entrada.error || !entrada.text) {\n  const content = 'Não consegui responder agora. Tente novamente em alguns instantes.';\n  return [{ json: { blocks: [{ type: 'insight', severity: 'warning', content }], message: content } }];\n}\n\nconst texto = String(entrada.text).trim();\n\nfunction lerBlocos(candidato) {\n  try {\n    const j = JSON.parse(candidato);\n    return (Array.isArray(j) ? j : j.blocks || []).filter((b) => b && TIPOS.includes(b.type));\n  } catch (e) {\n    return [];\n  }\n}\n\n// Tenta o texto puro; depois só o trecho entre o primeiro \"{\" e o último \"}\"\n// (a IA às vezes escreve algo antes/depois ou usa ```json); por fim, repara quebras\n// de linha dentro dos textos e vírgulas sobrando antes de \"]\" ou \"}\"\nconst inicio = texto.indexOf('{');\nconst fim = texto.lastIndexOf('}');\nconst trecho = inicio !== -1 && fim > inicio ? texto.slice(inicio, fim + 1) : texto;\nconst reparado = trecho.replace(/[\\x00-\\x1f]+/g, ' ').replace(/,\\s*([}\\]])/g, '$1');\n\nlet blocks = [];\nfor (const candidato of [texto, trecho, reparado]) {\n  blocks = lerBlocos(candidato);\n  if (blocks.length) break;\n}\n\nif (!blocks.length) {\n  blocks = [{ type: 'text', content: texto }];\n}\n\nconst primeiro = blocks.find((b) => b.type === 'text' || b.type === 'insight');\nreturn [{ json: { blocks, message: primeiro ? primeiro.content : 'Resposta da SIL' } }];\n"
+        "jsCode": "// SIL Chat — monta a resposta final. Tabela e gráfico saem dos dados reais da consulta;\n// da IA vem só o resumo, os nomes/formatos das colunas e o insight.\nconst { situacao } = $('Preparar Resposta').first().json;\nconst consulta = $('Consultar Base').first().json;\nconst entrada = $input.first().json;\n\nconst MENSAGENS = {\n  falha: { type: 'insight', severity: 'warning', content: 'Não consegui responder agora. Tente novamente em alguns instantes.' },\n  erro: { type: 'insight', severity: 'warning', content: 'Não consegui buscar essa informação. Tente reformular, indicando o período ou o nome do vendedor, cliente ou produto.' },\n  vazio: { type: 'insight', severity: 'info', content: 'Não encontrei dados para esse filtro. Confira o período ou o nome pesquisado.' },\n};\n\nfunction responder(blocks) {\n  const primeiro = blocks.find((b) => b.type === 'text' || b.type === 'insight');\n  return [{ json: { blocks, message: primeiro ? primeiro.content : 'Resposta da SIL' } }];\n}\n\n// JSON da IA: tenta puro, depois só o trecho entre { e }, depois com reparos comuns\nfunction lerJson(texto) {\n  const inicio = texto.indexOf('{');\n  const fim = texto.lastIndexOf('}');\n  const trecho = inicio !== -1 && fim > inicio ? texto.slice(inicio, fim + 1) : texto;\n  const reparado = trecho.replace(/[\\x00-\\x1f]+/g, ' ').replace(/,\\s*([}\\]])/g, '$1');\n  for (const candidato of [texto, trecho, reparado]) {\n    try {\n      const j = JSON.parse(candidato);\n      if (j && typeof j === 'object') return j;\n    } catch (e) {}\n  }\n  return null;\n}\n\nconst ia = entrada.error ? null : lerJson(String(entrada.text || '').trim());\n\nif (MENSAGENS[situacao]) return responder([MENSAGENS[situacao]]);\n\nif (situacao === 'conversa') {\n  const resumo = (ia && ia.resumo) || 'Olá! Sou a SIL. Pergunte sobre faturamento, vendedores, clientes, produtos, margem ou metas.';\n  return responder([{ type: 'text', content: resumo }]);\n}\n\n// ---- situacao === 'dados' ----\nconst colunas = consulta.colunas;\nconst linhas = consulta.rows.slice(0, 100);\nconst infoIa = (ia && ia.colunas) || {};\n\nfunction formatoPadrao(coluna) {\n  const nome = coluna.toLowerCase();\n  const valores = linhas.map((l) => l[coluna]).filter((v) => v !== null && v !== undefined);\n  if (!valores.length || !valores.every((v) => typeof v === 'number')) return 'texto';\n  if (/(margem|pct|percent|cresc|particip|%)/.test(nome)) return 'percentual';\n  if (/(fat|lucro|venda|meta|ticket|valor|receita|custo|tendencia|projec)/.test(nome)) return 'moeda';\n  return 'numero';\n}\n\nconst formato = {};\nconst nomeColuna = {};\nfor (const c of colunas) {\n  const info = infoIa[c] || {};\n  formato[c] = ['moeda', 'percentual', 'numero', 'texto'].includes(info.formato) ? info.formato : formatoPadrao(c);\n  nomeColuna[c] = info.nome || c.replace(/_/g, ' ').replace(/^\\w/, (l) => l.toUpperCase());\n}\n\nfunction dec(v, casas) {\n  return v.toLocaleString('pt-BR', { minimumFractionDigits: casas, maximumFractionDigits: casas });\n}\n\nfunction fmt(v, f) {\n  if (v === null || v === undefined || v === '') return '—';\n  if (typeof v !== 'number') return String(v);\n  if (f === 'moeda') return 'R$ ' + dec(v, 2);\n  if (f === 'percentual') return dec(v * 100, 1) + '%';\n  if (f === 'numero') return Number.isInteger(v) ? v.toLocaleString('pt-BR') : dec(v, 2);\n  return String(v);\n}\n\nconst blocks = [];\nconst resumo = ia && ia.resumo;\nblocks.push({ type: 'text', content: resumo || 'Aqui estão os dados encontrados:' });\n\nconst g = ia && ia.grafico;\nconst tiposGrafico = ['bar', 'horizontal-bar', 'line', 'pie'];\nif (g && tiposGrafico.includes(g.tipo) && colunas.includes(g.rotulo) && Array.isArray(g.valores)) {\n  const valores = g.valores.filter((c) => colunas.includes(c) && formato[c] !== 'texto');\n  if (valores.length) {\n    const pontos = linhas.slice(0, 30);\n    const emPercentual = formato[valores[0]] === 'percentual';\n    blocks.push({\n      type: 'chart',\n      chartType: g.tipo,\n      title: g.titulo || (ia && ia.titulo) || '',\n      data: {\n        labels: pontos.map((l) => String(l[g.rotulo])),\n        datasets: valores.map((c) => ({\n          // Percentuais vão em pontos percentuais (19,0) com \"(%)\" no nome da série\n          label: nomeColuna[c] + (formato[c] === 'percentual' ? ' (%)' : ''),\n          values: pontos.map((l) => {\n            const v = Number(l[c]) || 0;\n            return formato[c] === 'percentual' ? Math.round(v * 1000) / 10 : v;\n          }),\n        })),\n      },\n      config: { currency: formato[valores[0]] === 'moeda', percentage: false, showLegend: valores.length > 1 && !emPercentual },\n    });\n  }\n}\n\n// Um único valor (ex.: \"qual o faturamento de hoje?\") já está no resumo; tabela só quando ajuda\nif (!(resumo && linhas.length === 1 && colunas.length <= 2)) {\n  blocks.push({\n    type: 'table',\n    title: (ia && ia.titulo) || '',\n    headers: colunas.map((c) => nomeColuna[c]),\n    rows: linhas.map((l) => colunas.map((c) => fmt(l[c], formato[c]))),\n  });\n}\n\nconst insight = ia && ia.insight;\nif (insight && insight.content) {\n  const severidades = ['info', 'success', 'warning', 'danger'];\n  blocks.push({\n    type: 'insight',\n    severity: severidades.includes(insight.severity) ? insight.severity : 'info',\n    content: String(insight.content),\n  });\n}\n\nreturn responder(blocks);\n"
       },
-      "id": "4a94c6d3-a5c1-4ad9-bcdb-624b29349ba6",
+      "id": "24ae1aeb-7075-4c50-aab3-ca1930e6640c",
       "name": "Montar Blocos",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -171,7 +171,7 @@
         "responseBody": "={{ JSON.stringify($json) }}",
         "options": {}
       },
-      "id": "154a8435-7dca-4b87-bae3-14c163eeb711",
+      "id": "216df1f1-f5e0-47b3-a6fd-8ea5d6e41844",
       "name": "Responder Chat",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
@@ -270,7 +270,7 @@
         ]
       ]
     },
-    "Gemini SQL": {
+    "Groq SQL": {
       "ai_languageModel": [
         [
           {
@@ -281,7 +281,7 @@
         ]
       ]
     },
-    "Gemini Resposta": {
+    "Groq Resposta": {
       "ai_languageModel": [
         [
           {
