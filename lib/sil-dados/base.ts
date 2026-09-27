@@ -209,6 +209,22 @@ export async function lerEsquema(companyId: string) {
   }
 }
 
+// Data e tamanho da última carga: o chat usa para saber até quando os dados vão
+export async function lerStatus(companyId: string) {
+  const { con, fechar } = await abrirLeitura(companyId);
+
+  try {
+    // epoch em ms -> ISO com "Z", que o n8n (Luxon) lê sem ambiguidade de fuso
+    const [carga] = await linhas(con, "select epoch_ms(carregado_em) as ms, linhas from _carga");
+    return {
+      carregado_em: carga ? new Date(Number(carga.ms)).toISOString() : null,
+      linhas: carga ? JSON.parse(String(carga.linhas)) : null,
+    };
+  } finally {
+    fechar();
+  }
+}
+
 export async function consultar(companyId: string, sqlBruto: string) {
   const sql = sqlBruto.trim().replace(/;+\s*$/, "").trim();
   if (sql.includes(";") || !/^(select|with)\b/i.test(sql)) {

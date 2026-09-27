@@ -2,7 +2,7 @@
 // Fluxo exclusivo da JA: a empresa é fixa aqui, nunca vem do payload
 const COMPANY_ID = '8b4798b9-0386-4f04-95b4-913d2d868322';
 
-const body = $input.first().json.body || {};
+const body = $('Webhook SIL Chat').first().json.body || {};
 const pergunta = String(body.chatInput || body.message || '').trim();
 // Histórico curto: cada token conta no limite por minuto da IA
 const historico = Array.isArray(body.historico) ? body.historico.slice(-4) : [];
@@ -10,12 +10,25 @@ const conversa = historico
   .map((h) => (h.role === 'user' ? 'Usuário: ' : 'SIL: ') + String(h.content || '').slice(0, 300))
   .join('\n');
 
-const agora = $now.setZone('America/Fortaleza');
+const FUSO = 'America/Fortaleza';
+const agora = $now.setZone(FUSO);
 const hoje = agora.toFormat('dd/MM/yyyy');
-const mesAtual = Number(agora.toFormat('yyyyMM'));
-const diasNoMes = agora.daysInMonth;
-// A base é carregada às 06h com o faturamento até o dia anterior
-const diasDecorridos = Math.max(agora.day - 1, 1);
+
+// Até quando vão os dados: a carga das 06h traz o faturamento até o dia anterior a ela.
+// Se a carga de hoje falhou, a base ainda é a de ontem e tudo abaixo usa essa data real.
+const status = $('Status Base').first().json;
+const carregadoEm = status.ok && status.carregado_em ? DateTime.fromISO(status.carregado_em).setZone(FUSO) : null;
+const dataRef = (carregadoEm || agora).minus({ days: 1 }).startOf('day');
+const dadosAte = dataRef.toFormat('dd/MM/yyyy');
+const atualizadoEm = carregadoEm ? carregadoEm.toFormat("dd/MM 'às' HH:mm") : null;
+// Normal: dados até ontem. Mais antigo que isso = a carga de hoje não aconteceu.
+const diasAtraso = Math.round(agora.startOf('day').diff(dataRef, 'days').days) - 1;
+const defasada = !carregadoEm || diasAtraso > 0;
+
+const mesAtual = Number(dataRef.toFormat('yyyyMM'));
+const diasNoMes = dataRef.daysInMonth;
+const diasDecorridos = dataRef.day;
+const mesFechado = diasDecorridos === diasNoMes;
 
 const ESQUEMA = `
 Tabela base_comercial — uma linha por VENDEDOR × MÊS × FILIAL
@@ -36,7 +49,7 @@ Tabela base_produtos — uma linha por PRODUTO × MÊS × FILIAL
 
 const promptSql = `Você escreve UMA consulta SQL (dialeto DuckDB) sobre os dados comerciais da JA Distribuidora.
 
-Hoje é ${hoje}. Mês atual: ${mesAtual}, em andamento (${diasDecorridos} de ${diasNoMes} dias corridos já faturados). Os dados cobrem os últimos 14 meses.
+Hoje é ${hoje}. Os dados vão até ${dadosAte}. Mês atual dos dados: ${mesAtual}, ${mesFechado ? 'já fechado' : `em andamento (${diasDecorridos} de ${diasNoMes} dias corridos já faturados)`}. Os dados cobrem os últimos 14 meses.
 ${ESQUEMA}
 Regras:
 - Filtre e ordene períodos por mesanonum; mes_ano só para exibir. "Mês passado" = maior mesanonum < ${mesAtual}. Sem período, use o mês atual.
@@ -58,4 +71,4 @@ Pergunta: ${pergunta}
 
 Responda APENAS com o SQL (ou SEM_CONSULTA), sem explicação e sem markdown.`;
 
-return [{ json: { pergunta, company_id: COMPANY_ID, hoje, mesAtual, diasNoMes, diasDecorridos, conversa, promptSql } }];
+return [{ json: { pergunta, company_id: COMPANY_ID, hoje, dadosAte, atualizadoEm, defasada, mesAtual, diasNoMes, diasDecorridos, conversa, promptSql } }];

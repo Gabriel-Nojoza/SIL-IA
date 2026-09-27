@@ -27,7 +27,7 @@ Responda em português, em 1 a 3 frases, APENAS com JSON: {"resumo": "sua respos
   const linhas = r.rows.slice(0, MAX_LINHAS_IA).map((l) => r.colunas.map((c) => l[c]));
   const dados = JSON.stringify({ colunas: r.colunas, linhas, total_linhas: r.rows.length });
 
-  promptResposta = `Você é a SIL, assistente comercial da JA Distribuidora. Hoje é ${p.hoje}; o mês atual (${p.mesAtual}) está em andamento.
+  promptResposta = `Você é a SIL, assistente comercial da JA Distribuidora. Hoje é ${p.hoje}; os dados vão até ${p.dadosAte} (mês atual dos dados: ${p.mesAtual}).
 
 Pergunta: ${p.pergunta}
 

@@ -7,6 +7,21 @@ import { TableBlock } from "./blocks/TableBlock";
 import { InsightBlock } from "./blocks/InsightBlock";
 import { ActionBlock } from "./blocks/ActionBlock";
 
+function Fonte({ fonte }: { fonte: NonNullable<SilResponse["fonte"]> }) {
+  if (!fonte.dadosAte) return null;
+
+  return (
+    <p className="flex items-center gap-1.5 text-[11px] text-muted">
+      <span
+        className={`h-1.5 w-1.5 rounded-full ${fonte.defasada ? "bg-yellow-400" : "bg-success"}`}
+        aria-hidden
+      />
+      Dados até {fonte.dadosAte}
+      {fonte.atualizadoEm ? ` · atualizado em ${fonte.atualizadoEm}` : " · atualização não confirmada"}
+    </p>
+  );
+}
+
 export function SilBubble({ response }: { response: SilResponse }) {
   return (
     <div className="flex flex-col gap-3">
@@ -20,6 +35,7 @@ export function SilBubble({ response }: { response: SilResponse }) {
           default:        return null;
         }
       })}
+      {response.fonte ? <Fonte fonte={response.fonte} /> : null}
     </div>
   );
 }

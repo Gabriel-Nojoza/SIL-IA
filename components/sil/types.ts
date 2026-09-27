@@ -5,6 +5,12 @@ export interface SilResponse {
     executionTimeMs?: number;
     dataPoints?: number;
   };
+  /** Até quando vão os dados da resposta (vem do n8n, "Montar Blocos") */
+  fonte?: {
+    dadosAte?: string;
+    atualizadoEm?: string | null;
+    defasada?: boolean;
+  };
 }
 
 export type SilBlock =

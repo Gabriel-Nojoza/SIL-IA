@@ -1,8 +1,19 @@
 // SIL Chat — monta a resposta final. Tabela e gráfico saem dos dados reais da consulta;
 // da IA vem só o resumo, os nomes/formatos das colunas e o insight.
 const { situacao } = $('Preparar Resposta').first().json;
+const { dadosAte, atualizadoEm, defasada } = $('Preparar Pergunta').first().json;
 const consulta = $('Consultar Base').first().json;
 const entrada = $input.first().json;
+
+// Rodapé de cada resposta no chat: até quando vão os dados
+const fonte = { dadosAte, atualizadoEm, defasada };
+const avisoDefasada = {
+  type: 'insight',
+  severity: 'warning',
+  content: atualizadoEm
+    ? `A base não foi atualizada hoje: os números vão só até ${dadosAte} (última carga em ${atualizadoEm}).`
+    : 'Não consegui confirmar quando a base foi atualizada. Os números podem estar desatualizados.',
+};
 
 const MENSAGENS = {
   falha: { type: 'insight', severity: 'warning', content: 'Não consegui responder agora. Tente novamente em alguns instantes.' },
@@ -12,7 +23,10 @@ const MENSAGENS = {
 
 function responder(blocks) {
   const primeiro = blocks.find((b) => b.type === 'text' || b.type === 'insight');
-  return [{ json: { blocks, message: primeiro ? primeiro.content : 'Resposta da SIL' } }];
+  // Conversa (saudação, ajuda) não usa dados: sem rodapé nem aviso
+  const comDados = situacao === 'dados' || situacao === 'vazio';
+  if (comDados && defasada) blocks.push(avisoDefasada);
+  return [{ json: { blocks, message: primeiro ? primeiro.content : 'Resposta da SIL', ...(comDados ? { fonte } : {}) } }];
 }
 
 // JSON da IA: tenta puro, depois só o trecho entre { e }, depois com reparos comuns
