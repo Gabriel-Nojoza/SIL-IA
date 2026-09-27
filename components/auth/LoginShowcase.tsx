@@ -369,10 +369,9 @@ export function LoginShowcase() {
       <div className="absolute inset-y-0 left-0 right-0 xl:right-[216px]">
         <Conversa />
       </div>
-      <div className="absolute right-0 top-16 z-10 hidden xl:block">
+      {/* Coluna única com espaço fixo: os cartões nunca se encostam, qualquer que seja a altura da tela */}
+      <div className="absolute right-0 top-1/2 z-10 hidden -translate-y-1/2 flex-col gap-5 xl:flex">
         <CartaoFaturamento />
-      </div>
-      <div className="absolute bottom-24 right-0 z-10 hidden xl:block">
         <CartaoMeta />
       </div>
 
