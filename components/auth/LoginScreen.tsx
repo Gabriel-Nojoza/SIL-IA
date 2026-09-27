@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, ChartColumn, Check, CircleAlert, LoaderCircle, Mail, MessageSquareText, RefreshCw, ShieldCheck, User } from "lucide-react";
+import { ArrowRight, Check, CircleAlert, LoaderCircle, Mail, ShieldCheck, User } from "lucide-react";
+import { LoginShowcase } from "@/components/auth/LoginShowcase";
 import { listCompanies } from "@/lib/company-service";
 import { useAuthContext } from "@/hooks/use-auth-context";
 import { useAdminSurface } from "@/hooks/use-admin-surface";
@@ -200,12 +201,13 @@ export function LoginScreen() {
 
   return (
     <main className="flex h-[100dvh] w-screen overflow-hidden bg-[#070a12]">
-      {/* ── LADO ESQUERDO: apresentação ── */}
-      <section className="relative hidden flex-1 flex-col justify-between overflow-hidden px-14 py-12 lg:flex xl:px-20">
+      {/* ── LADO ESQUERDO: demonstração animada ── */}
+      <section className="relative hidden min-w-0 flex-1 flex-col overflow-hidden px-12 py-10 lg:flex xl:px-16">
         <div className="pointer-events-none absolute inset-0 bg-hero-grid bg-[length:48px_48px] opacity-40 [mask-image:radial-gradient(ellipse_at_30%_40%,black,transparent_75%)]" />
-        <div className="pointer-events-none absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full bg-accent/[0.07] blur-[140px]" />
+        <div className="pointer-events-none absolute -left-40 -top-40 h-[520px] w-[520px] rounded-full bg-accent/[0.08] blur-[140px]" />
+        <div className="pointer-events-none absolute -bottom-40 right-0 h-[420px] w-[420px] rounded-full bg-teal-400/[0.05] blur-[140px]" />
 
-        <header className="relative z-10 flex items-center gap-3">
+        <header className="relative z-10 flex shrink-0 items-center gap-3">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/sil-logo.png" alt="" className="h-9 w-auto" />
           <div className="leading-tight">
@@ -214,68 +216,19 @@ export function LoginScreen() {
           </div>
         </header>
 
-        <div className="relative z-10 max-w-xl">
-          <h1 className="text-[2.5rem] font-semibold leading-[1.15] tracking-tight text-foreground xl:text-5xl">
-            Os números da sua operação, em uma pergunta.
+        <div className="relative z-10 mt-8 max-w-3xl shrink-0">
+          <h1 className="text-3xl font-semibold leading-tight tracking-tight text-foreground xl:text-4xl">
+            Pergunte. A SIL responde <span className="text-accent">com os números.</span>
           </h1>
-          <p className="mt-5 max-w-md text-[15px] leading-7 text-muted">
-            Pergunte em português sobre faturamento, metas, clientes e produtos. A SIL consulta a base do
-            Power BI e responde com tabela, gráfico e análise.
+          <p className="mt-3 max-w-lg text-sm leading-6 text-muted">
+            Faturamento, metas, tendência, clientes e produtos direto da base do Power BI, em tabela, gráfico e
+            análise.
           </p>
-
-          {/* Prévia de uma conversa */}
-          <div className="mt-10 rounded-2xl border border-white/[0.07] bg-white/[0.025] p-5 shadow-soft">
-            <div className="flex justify-end">
-              <p className="rounded-xl rounded-br-sm bg-accent/15 px-3.5 py-2 text-[13px] text-foreground/90">
-                Qual a tendência de fechamento por equipe?
-              </p>
-            </div>
-            <div className="mt-4 flex gap-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/sil-logo.png" alt="" className="mt-0.5 h-6 w-6 shrink-0 rounded-md" />
-              <div className="min-w-0 flex-1">
-                <p className="text-[13px] leading-6 text-foreground/80">
-                  Duas equipes devem fechar acima da meta. Food Service precisa acelerar na última semana.
-                </p>
-                <div className="mt-3 overflow-hidden rounded-lg border border-white/[0.06]">
-                  {[
-                    { equipe: "Capital", pct: 108 },
-                    { equipe: "Interior", pct: 101 },
-                    { equipe: "Food Service", pct: 86 },
-                  ].map((linha) => (
-                    <div
-                      key={linha.equipe}
-                      className="grid grid-cols-[7rem_1fr_3rem] items-center gap-3 border-b border-white/[0.05] px-3 py-2 text-xs last:border-b-0"
-                    >
-                      <span className="text-foreground/80">{linha.equipe}</span>
-                      <span className="h-1 overflow-hidden rounded-full bg-white/[0.06]">
-                        <span
-                          className={`block h-full rounded-full ${linha.pct >= 100 ? "bg-accent" : "bg-muted/60"}`}
-                          style={{ width: `${Math.min(linha.pct, 110) / 1.1}%` }}
-                        />
-                      </span>
-                      <span className="text-right tabular-nums text-foreground/80">{linha.pct}%</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
-        <footer className="relative z-10 grid max-w-xl grid-cols-3 gap-6 text-xs leading-5 text-muted">
-          {[
-            { icon: MessageSquareText, titulo: "Linguagem natural", texto: "Sem filtros nem relatórios." },
-            { icon: ChartColumn, titulo: "Tabela e gráfico", texto: "Prontos para copiar e apresentar." },
-            { icon: RefreshCw, titulo: "Base diária", texto: "Atualizada todo dia às 6h." },
-          ].map(({ icon: Icon, titulo, texto }) => (
-            <div key={titulo}>
-              <Icon className="mb-2 h-4 w-4 text-accent" strokeWidth={1.75} />
-              <p className="font-medium text-foreground/90">{titulo}</p>
-              <p>{texto}</p>
-            </div>
-          ))}
-        </footer>
+        <div className="relative z-10 mt-8 min-h-0 flex-1">
+          <LoginShowcase />
+        </div>
       </section>
 
       {/* ── LADO DIREITO: formulário ── */}
